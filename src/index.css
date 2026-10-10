@@ -2,8 +2,9 @@
 
 /* ------------------------------------------------------------------
    Sistema de diseño — Servicio Eléctrico
-   Mismo lenguaje visual que control-de-autos/campeonato-web: los montos
-   se tratan como cifras de recibo (monoespaciadas, tabulares).
+   Mismo lenguaje que control-de-autos/campeonato-web (papel, tinta,
+   montos como cifras de recibo), pero con los colores del talonario
+   del comité: tinta azul sobre papel amarillo.
 ------------------------------------------------------------------- */
 
 @theme {
@@ -12,20 +13,29 @@
 
   --color-ink: #14171f;
   --color-ink-soft: #4b5260;
-  --color-paper: #f7f5f0;
+  --color-paper: #f5f6f9;
   --color-surface: #ffffff;
-  --color-line: #e4e0d6;
+  --color-line: #e1e4ec;
 
-  --color-brand: #1e4d3d;
-  --color-brand-dark: #133229;
-  --color-brand-soft: #e3ece7;
+  --color-brand: #1f3f8f;
+  --color-brand-dark: #142a63;
+  --color-brand-soft: #e6ebf7;
 
-  --color-gold: #a3791f;
-  --color-gold-soft: #f4ead2;
+  --color-amber: #8a5a00;
+  --color-amber-soft: #fbf0d3;
+  --color-spark: #f5b921;
+
+  /* Las dos series del gráfico (validadas para daltonismo). */
+  --color-serie-1: #2a4fb0;
+  --color-serie-2: #d98a00;
+
+  /* El recibo de papel. */
+  --color-recibo: #f6f3ae;
+  --color-recibo-tinta: #1c2f86;
 
   --color-success: #1f7a4d;
   --color-success-soft: #e3f2e9;
-  --color-warning: #b7791f;
+  --color-warning: #9a6200;
   --color-warning-soft: #faf1de;
   --color-danger: #b3261e;
   --color-danger-soft: #fbe8e6;
@@ -61,4 +71,33 @@ body {
 }
 .no-spinner {
   -moz-appearance: textfield;
+}
+
+/* --- Impresión de recibos: en papel solo sale la zona de impresión
+   (ver ui/impresion.jsx), tres recibos por hoja A4. --- */
+.zona-impresion {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+  html,
+  body {
+    background: #fff;
+  }
+  #root {
+    display: none;
+  }
+  .zona-impresion {
+    display: block;
+  }
+  .zona-impresion .recibo-hoja {
+    break-inside: avoid;
+    margin-bottom: 6mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
