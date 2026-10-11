@@ -8,6 +8,7 @@ import { linkWhatsapp, mensajeRecibo } from '../domain/whatsapp'
 import { Boton, Buscador, Insignia, Modal, Tarjeta, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
 import { imprimirRecibos } from '../ui/colaImpresion'
+import { BotonReciboImagen } from '../ui/BotonReciboImagen'
 
 const FILTROS = [
   { id: 'todos', texto: 'Todos' },
@@ -190,13 +191,17 @@ function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
         </div>
       )}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3">
+        <BotonReciboImagen recibo={recibo} usuario={usuario} periodo={periodo} config={config} className="border border-success/40 bg-success-soft px-4 py-3 text-sm text-success" />
+      </div>
+
+      <div className="mt-2 flex gap-2">
         <Boton variante="secundario" className="flex-1" onClick={() => imprimirRecibos([{ recibo, usuario, periodo }])}>
           🖨️ Imprimir
         </Boton>
         {whatsapp ? (
           <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={() => marcarWhatsapp(recibo.id)} className="flex-1 rounded-xl border border-success/40 bg-success-soft px-4 py-2.5 text-center text-sm font-bold text-success">
-            {recibo.whatsapp ? 'Reenviar WhatsApp' : 'WhatsApp'}
+            💬 Texto por WhatsApp
           </a>
         ) : (
           <span className="flex-1 rounded-xl border border-dashed border-line px-4 py-2.5 text-center text-xs text-ink-soft">Sin celular registrado</span>

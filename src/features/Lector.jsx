@@ -7,6 +7,7 @@ import { formatearFecha, nombrePeriodo } from '../domain/fecha'
 import { linkWhatsapp, mensajeRecibo } from '../domain/whatsapp'
 import { Boton, Buscador, Modal, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
+import { BotonReciboImagen } from '../ui/BotonReciboImagen'
 
 // Panel exclusivo de quien sale a tomar lecturas (pedido del usuario,
 // 2026-10-11): sin menú ni nada de tesorería, pensado para el celular
@@ -314,16 +315,27 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
         </div>
       )}
 
+      {/* Dos formas de mandarlo: la imagen del recibo amarillo (hay que
+          elegir el contacto en WhatsApp) o el mismo detalle como texto
+          (abre directo el chat del vecino, por eso necesita su celular). */}
+      <BotonReciboImagen
+        recibo={recibo}
+        usuario={usuario}
+        periodo={periodo}
+        config={config}
+        className={`px-4 py-4 text-base ${enviado ? 'border border-success/40 bg-success-soft text-success' : 'bg-success text-white'}`}
+      />
+
       {whatsapp ? (
         <a
           href={whatsapp}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => marcarWhatsapp(recibo.id)}
-          className={`block w-full rounded-xl px-4 py-4 text-center text-base font-extrabold ${enviado ? 'border border-success/40 bg-success-soft text-success' : 'bg-success text-white'}`}
+          className="block w-full rounded-xl border border-success/40 bg-surface px-4 py-3 text-center text-sm font-bold text-success"
         >
-          {enviado ? '↻ Reenviar por WhatsApp' : 'Enviar recibo por WhatsApp'}
-          <span className="money block text-xs font-semibold opacity-80">al {usuario.telefono}</span>
+          💬 Enviarlo como mensaje de texto
+          <span className="money block text-xs font-semibold opacity-80">directo al {usuario.telefono}</span>
         </a>
       ) : (
         <form
@@ -333,7 +345,7 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
           }}
           className="rounded-xl border border-dashed border-warning/50 bg-warning-soft p-3"
         >
-          <p className="mb-2 text-xs font-bold text-warning">Este usuario no tiene celular registrado. Pídeselo y anótalo:</p>
+          <p className="mb-2 text-xs font-bold text-warning">Sin celular registrado (hace falta para el mensaje de texto). Pídeselo y anótalo:</p>
           <div className="flex gap-2">
             <input
               type="tel"
