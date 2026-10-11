@@ -16,6 +16,11 @@ const FILTROS = [
   { id: 'pagado', texto: 'Pagados' },
 ]
 
+// Cuántos recibos se muestran de entrada - el resto se despliega con
+// la flechita, para no tener que bajar una lista larguísima en el
+// celular (pedido del usuario, 2026-10-11).
+const LIMITE_LISTA = 5
+
 // Recibos emitidos: cobrar, ver el recibo como el de papel, imprimirlo
 // o mandarlo por WhatsApp. "Todo lo pendiente" junta la deuda de todos
 // los meses, para cobrarle a alguien que debe varios.
@@ -25,15 +30,17 @@ export default function Recibos({ onIr }) {
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
   const [abiertoId, setAbiertoId] = useState(null)
+  // Guarda PARA QUÉ vista se desplegó la lista: al cambiar de periodo,
+  // de pestaña o de búsqueda vuelve sola a mostrar solo los primeros.
+  const [desplegada, setDesplegada] = useState(null)
 
   const todoPendiente = periodoId === 'pendientes'
   const base = todoPendiente ? recibos.filter((r) => !r.pago) : recibos.filter((r) => r.periodoId === periodoId)
   const resumen = resumenPeriodo(base)
   const texto = busqueda.trim().toLowerCase()
-  const visibles = base
+  const encontrados = base
     .map((r) => ({ ...r, usuario: usuariosPorId.get(r.usuarioId) }))
     .filter((r) => r.usuario)
-    .filter((r) => filtro === 'todos' || (filtro === 'pagado' ? r.pago : !r.pago))
     .filter(
       (r) =>
         !texto ||
@@ -43,6 +50,16 @@ export default function Recibos({ onIr }) {
         `${r.usuario.mz}${r.usuario.lote}`.toLowerCase().includes(texto.replace(/\s|-/g, ''))
     )
     .sort((a, b) => b.periodoId.localeCompare(a.periodoId) || compararUbicacion(a.usuario, b.usuario))
+  // El número de cada pestaña (cuántos deben, cuántos pagaron).
+  const cantidades = {
+    todos: encontrados.length,
+    debe: encontrados.filter((r) => !r.pago).length,
+    pagado: encontrados.filter((r) => r.pago).length,
+  }
+  const visibles = encontrados.filter((r) => filtro === 'todos' || (filtro === 'pagado' ? r.pago : !r.pago))
+  const vista = `${periodoId}|${filtro}|${texto}`
+  const verTodos = desplegada === vista
+  const restantes = visibles.length - LIMITE_LISTA
 
   const abierto = abiertoId ? recibos.find((r) => r.id === abiertoId) : null
 
@@ -100,6 +117,7 @@ export default function Recibos({ onIr }) {
               className={`flex-1 rounded-xl px-3 py-2 text-xs font-bold ${filtro === f.id ? 'bg-brand text-white' : 'border border-line bg-surface text-ink-soft'}`}
             >
               {f.texto}
+              <span className={`money ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filtro === f.id ? 'bg-white/20' : 'bg-paper'}`}>{cantidades[f.id]}</span>
             </button>
           ))}
         </div>
@@ -109,7 +127,7 @@ export default function Recibos({ onIr }) {
         <Vacio>{todoPendiente && !texto ? 'Nadie debe nada. 🎉' : 'Ningún recibo coincide.'}</Vacio>
       ) : (
         <Tarjeta className="divide-y divide-line overflow-hidden">
-          {visibles.map((r) => (
+          {(verTodos ? visibles : visibles.slice(0, LIMITE_LISTA)).map((r) => (
             <button key={r.id} type="button" onClick={() => setAbiertoId(r.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-brand-soft">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink">{r.usuario.nombre}</p>
@@ -122,6 +140,16 @@ export default function Recibos({ onIr }) {
               <span className="money w-24 shrink-0 text-right text-sm font-extrabold text-ink">{formatearMonto(r.total)}</span>
             </button>
           ))}
+          {restantes > 0 && (
+            <button
+              type="button"
+              onClick={() => setDesplegada(verTodos ? null : vista)}
+              aria-expanded={verTodos}
+              className="w-full bg-paper px-4 py-3 text-center text-xs font-bold text-brand"
+            >
+              {verTodos ? '▲ Ver menos' : `▼ Ver los ${restantes} restantes`}
+            </button>
+          )}
         </Tarjeta>
       )}
 
