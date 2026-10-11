@@ -9,6 +9,7 @@ import { Boton, Buscador, Modal, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
 import { BotonReciboImagen } from '../ui/BotonReciboImagen'
 import { CobroRecibo } from '../ui/CobroRecibo'
+import { BotonReciboPegar } from '../ui/BotonReciboPegar'
 
 // Panel exclusivo de quien sale a tomar lecturas (pedido del usuario,
 // 2026-10-11): sin menú ni nada de tesorería, pensado para el celular
@@ -329,6 +330,8 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
         config={config}
         className={`px-4 py-4 text-base ${enviado ? 'border border-success/40 bg-success-soft text-success' : 'bg-success text-white'}`}
       />
+
+      <BotonReciboPegar recibo={recibo} usuario={usuario} periodo={periodo} config={config} />
 
       {whatsapp ? (
         <a
