@@ -8,13 +8,14 @@ import { linkWhatsapp, mensajeRecibo } from '../domain/whatsapp'
 import { Boton, Buscador, Modal, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
 import { BotonReciboImagen } from '../ui/BotonReciboImagen'
+import { CobroRecibo } from '../ui/CobroRecibo'
 
 // Panel exclusivo de quien sale a tomar lecturas (pedido del usuario,
 // 2026-10-11): sin menú ni nada de tesorería, pensado para el celular
 // en la calle. El recorrido de cada lote es uno solo:
 //
 //   buscar el lote -> anotar la lectura -> se emite su recibo ->
-//   mandarlo por WhatsApp
+//   mandarlo por WhatsApp (y cobrarlo ahí mismo, si el vecino paga)
 //
 // y tres listas para no perderse: a quién falta leer, a quién ya se le
 // leyó pero falta mandarle el recibo ("Por enviar" - un usuario recién
@@ -142,7 +143,10 @@ export default function Lector({ onSalir }) {
                   </p>
                 </div>
                 {f.recibo ? (
-                  <span className="money shrink-0 text-sm font-extrabold text-ink">{formatearMonto(f.recibo.total)}</span>
+                  <span className="shrink-0 text-right">
+                    <span className="money block text-sm font-extrabold text-ink">{formatearMonto(f.recibo.total)}</span>
+                    {f.recibo.pago && <span className="block text-[10px] font-bold uppercase text-success">✓ Pagado</span>}
+                  </span>
                 ) : (
                   <span className="shrink-0 rounded-full bg-amber-soft px-2.5 py-1 text-[10px] font-bold uppercase text-amber">Leer</span>
                 )}
@@ -361,6 +365,8 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
           </div>
         </form>
       )}
+
+      <CobroRecibo recibo={recibo} usuario={usuario} />
 
       <Boton variante="secundario" className="w-full py-3" onClick={onCerrar}>
         Siguiente lote →

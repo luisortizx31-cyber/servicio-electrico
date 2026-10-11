@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useDatos } from '../data/useDatos'
-import { registrarPago, anularPago, marcarWhatsapp } from '../data/store'
+import { marcarWhatsapp } from '../data/store'
 import { compararUbicacion, resumenPeriodo } from '../domain/calculo'
 import { formatearMonto, formatearNumeroRecibo } from '../domain/dinero'
-import { formatearFecha, nombrePeriodo } from '../domain/fecha'
+import { nombrePeriodo } from '../domain/fecha'
 import { linkWhatsapp, mensajeRecibo } from '../domain/whatsapp'
 import { Boton, Buscador, Insignia, Modal, Tarjeta, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
 import { imprimirRecibos } from '../ui/colaImpresion'
 import { BotonReciboImagen } from '../ui/BotonReciboImagen'
+import { CobroRecibo } from '../ui/CobroRecibo'
 
 const FILTROS = [
   { id: 'todos', texto: 'Todos' },
@@ -25,7 +26,7 @@ const LIMITE_LISTA = 5
 // o mandarlo por WhatsApp. "Todo lo pendiente" junta la deuda de todos
 // los meses, para cobrarle a alguien que debe varios.
 export default function Recibos({ onIr }) {
-  const { hoy, config, usuariosPorId, periodos, periodoActual, recibos } = useDatos()
+  const { config, usuariosPorId, periodos, periodoActual, recibos } = useDatos()
   const [periodoId, setPeriodoId] = useState(periodoActual?.id ?? 'pendientes')
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
@@ -158,7 +159,6 @@ export default function Recibos({ onIr }) {
           recibo={abierto}
           usuario={usuariosPorId.get(abierto.usuarioId)}
           config={config}
-          hoy={hoy}
           onCerrar={() => setAbiertoId(null)}
         />
       )}
@@ -175,12 +175,7 @@ function Mini({ etiqueta, valor }) {
   )
 }
 
-function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
-  const [fecha, setFecha] = useState(hoy)
-  // Elegir efectivo o Yape NO cobra todavía: primero pide confirmar,
-  // para que un toque de más no deje un recibo como pagado (pedido del
-  // usuario, 2026-10-11).
-  const [porConfirmar, setPorConfirmar] = useState(null) // null | 'efectivo' | 'yape'
+function DetalleRecibo({ recibo, usuario, config, onCerrar }) {
   const periodo = recibo.periodo
   const whatsapp = linkWhatsapp(usuario.telefono, mensajeRecibo({ recibo, usuario, periodo, config }))
 
@@ -188,63 +183,9 @@ function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
     <Modal titulo={`Recibo N° ${formatearNumeroRecibo(recibo.numero)}`} subtitulo={`${usuario.nombre} · ${nombrePeriodo(periodo)}`} onCerrar={onCerrar}>
       <ReciboPapel recibo={recibo} usuario={usuario} periodo={periodo} config={config} />
 
-      {recibo.pago ? (
-        <div className="mt-4 rounded-xl bg-success-soft p-3 text-sm text-success">
-          <p className="font-bold">✓ Pagado el {formatearFecha(recibo.pago.fecha)} · {recibo.pago.metodo === 'yape' ? 'Yape' : 'Efectivo'}</p>
-          <button
-            type="button"
-            onClick={() => confirm('¿Anular este pago? El recibo vuelve a quedar como pendiente.') && anularPago(recibo.id)}
-            className="mt-1 text-xs underline decoration-dotted"
-          >
-            Anular pago (se registró por error)
-          </button>
-        </div>
-      ) : (
-        <div className="mt-4 rounded-xl border border-line bg-surface p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-sm font-bold text-ink">Cobrar {formatearMonto(recibo.total)}</p>
-            <input
-              type="date"
-              value={fecha}
-              max={hoy}
-              onChange={(e) => setFecha(e.target.value)}
-              aria-label="Fecha de pago"
-              className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-ink outline-none focus-visible:border-brand"
-            />
-          </div>
-          {porConfirmar ? (
-            <div className={`rounded-xl p-3 ${porConfirmar === 'yape' ? 'bg-brand-soft' : 'bg-success-soft'}`}>
-              <p className="text-sm font-bold text-ink">
-                ¿Confirmar pago por {porConfirmar === 'yape' ? 'Yape' : 'efectivo'} de <span className="money">{formatearMonto(recibo.total)}</span>?
-              </p>
-              <p className="text-xs text-ink-soft">
-                {usuario.nombre} · fecha de pago {formatearFecha(fecha || hoy)}
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Boton variante="secundario" className="flex-1" onClick={() => setPorConfirmar(null)}>
-                  Cancelar
-                </Boton>
-                <Boton
-                  variante={porConfirmar === 'yape' ? 'primario' : 'exito'}
-                  className="flex-1"
-                  onClick={() => registrarPago(recibo.id, { fecha: fecha || hoy, metodo: porConfirmar })}
-                >
-                  ✓ Confirmar pago por {porConfirmar === 'yape' ? 'Yape' : 'efectivo'}
-                </Boton>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Boton variante="exito" className="flex-1" onClick={() => setPorConfirmar('efectivo')}>
-                💵 Efectivo
-              </Boton>
-              <Boton className="flex-1" onClick={() => setPorConfirmar('yape')}>
-                📱 Yape
-              </Boton>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="mt-4">
+        <CobroRecibo recibo={recibo} usuario={usuario} />
+      </div>
 
       <div className="mt-3">
         <BotonReciboImagen recibo={recibo} usuario={usuario} periodo={periodo} config={config} className="border border-success/40 bg-success-soft px-4 py-3 text-sm text-success" />
