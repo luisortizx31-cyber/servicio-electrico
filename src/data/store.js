@@ -21,7 +21,8 @@ import { generarEjemplo } from './ejemplo'
 //   recibos:  [{ id, numero, periodoId, usuarioId, lecturaAnterior,
 //                lecturaActual, consumo, costoConsumo, energiaPerdida,
 //                comision, mantenimiento, total, emitidoEn,
-//                pago: null | { fecha, metodo } }]
+//                pago: null | { fecha, metodo },
+//                whatsapp: null | { fecha, hora, veces } }]
 // }
 
 const CLAVE = 'servicio-electrico:v1'
@@ -242,7 +243,8 @@ export function guardarLectura(periodoId, usuarioId, valor) {
   } else {
     recibos = recibos.map((r) =>
       r.periodoId === periodoId && r.usuarioId === usuarioId
-        ? { ...r, lecturaActual: Number(valor), ...importeDe(r.lecturaAnterior, Number(valor), periodo) }
+        ? // Cambió el importe: el recibo que se mandó por WhatsApp ya no vale, hay que reenviarlo.
+          { ...r, lecturaActual: Number(valor), ...importeDe(r.lecturaAnterior, Number(valor), periodo), whatsapp: r.lecturaActual === Number(valor) ? r.whatsapp ?? null : null }
         : r
     )
   }
@@ -261,10 +263,12 @@ export function pendientesDeEmitir(e, periodoId) {
 
 // Emite, numerados en orden de manzana y lote, los recibos de todos los
 // que ya tienen lectura. Se puede volver a llamar cuando se completan
-// las lecturas que faltaban: solo emite los nuevos.
-export function emitirRecibos(periodoId) {
+// las lecturas que faltaban: solo emite los nuevos. Con `soloUsuarioId`
+// emite únicamente el de ese usuario (el panel del lector emite uno
+// por uno, apenas toma cada lectura).
+export function emitirRecibos(periodoId, soloUsuarioId) {
   const periodo = estado.periodos.find((p) => p.id === periodoId)
-  const pendientes = pendientesDeEmitir(estado, periodoId)
+  const pendientes = pendientesDeEmitir(estado, periodoId).filter((u) => !soloUsuarioId || u.id === soloUsuarioId)
   let numero = estado.config.siguienteNumero
   const nuevos = pendientes.map((u) => {
     const lecturaAnterior = lecturaAnteriorDe(estado, periodoId, u)
@@ -283,6 +287,26 @@ export function emitirRecibos(periodoId) {
   })
   fijar({ ...estado, recibos: [...estado.recibos, ...nuevos], config: { ...estado.config, siguienteNumero: numero } })
   return nuevos.length
+}
+
+// Deja anotado que se abrió WhatsApp con el recibo de este usuario. No
+// hay forma de saber si de verdad tocó "Enviar" dentro de WhatsApp,
+// así que es un registro de a quién ya se le mandó, no una
+// confirmación de entrega - por eso se puede desmarcar.
+export function marcarWhatsapp(reciboId, enviado = true) {
+  const ahora = new Date()
+  const hora = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
+  fijar({
+    ...estado,
+    recibos: estado.recibos.map((r) =>
+      r.id === reciboId ? { ...r, whatsapp: enviado ? { fecha: hoyISO(), hora, veces: (r.whatsapp?.veces || 0) + 1 } : null } : r
+    ),
+  })
+}
+
+export function guardarTelefono(usuarioId, telefono) {
+  const limpio = String(telefono || '').replace(/\D/g, '')
+  fijar({ ...estado, usuarios: estado.usuarios.map((u) => (u.id === usuarioId ? { ...u, telefono: limpio } : u)) })
 }
 
 export function registrarPago(reciboId, { fecha, metodo }) {

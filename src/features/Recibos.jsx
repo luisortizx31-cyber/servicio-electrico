@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDatos } from '../data/useDatos'
-import { registrarPago, anularPago } from '../data/store'
+import { registrarPago, anularPago, marcarWhatsapp } from '../data/store'
 import { compararUbicacion, resumenPeriodo } from '../domain/calculo'
 import { formatearMonto, formatearNumeroRecibo } from '../domain/dinero'
 import { formatearFecha, nombrePeriodo } from '../domain/fecha'
@@ -195,8 +195,8 @@ function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
           🖨️ Imprimir
         </Boton>
         {whatsapp ? (
-          <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-xl border border-success/40 bg-success-soft px-4 py-2.5 text-center text-sm font-bold text-success">
-            WhatsApp
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={() => marcarWhatsapp(recibo.id)} className="flex-1 rounded-xl border border-success/40 bg-success-soft px-4 py-2.5 text-center text-sm font-bold text-success">
+            {recibo.whatsapp ? 'Reenviar WhatsApp' : 'WhatsApp'}
           </a>
         ) : (
           <span className="flex-1 rounded-xl border border-dashed border-line px-4 py-2.5 text-center text-xs text-ink-soft">Sin celular registrado</span>

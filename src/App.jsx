@@ -10,6 +10,7 @@ import Cortes from './features/Cortes'
 import Caja from './features/Caja'
 import Periodos from './features/Periodos'
 import Ajustes from './features/Ajustes'
+import Lector from './features/Lector'
 
 // Las secciones siguen el orden del trabajo de cada mes: tomar
 // lecturas -> emitir y cobrar recibos -> cortes -> caja.
@@ -26,9 +27,13 @@ const SECCIONES = [
 // En el celular entran cuatro abajo; el resto va en "Más".
 const EN_BARRA = 4
 
+// Panel aparte, a pantalla completa y sin el menú de tesorería, para
+// quien sale a tomar lecturas (ver features/Lector.jsx).
+const LECTOR = 'lector'
+
 function seccionDeLaDireccion() {
   const id = window.location.hash.slice(1)
-  return SECCIONES.some((s) => s.id === id) ? id : 'inicio'
+  return id === LECTOR || SECCIONES.some((s) => s.id === id) ? id : 'inicio'
 }
 
 export default function App() {
@@ -51,6 +56,15 @@ export default function App() {
     window.history.pushState(null, '', '#' + id)
     setSeccionId(id)
     window.scrollTo(0, 0)
+  }
+
+  if (seccionId === LECTOR) {
+    return (
+      <>
+        <Lector onSalir={() => ir('inicio')} />
+        <ZonaImpresion config={estado.config} />
+      </>
+    )
   }
 
   const seccion = SECCIONES.find((s) => s.id === seccionId)
@@ -82,6 +96,10 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <button type="button" onClick={() => ir(LECTOR)} className="mt-auto flex items-center gap-3 rounded-xl bg-spark px-3 py-2.5 text-left text-sm font-extrabold text-brand-dark">
+          <span aria-hidden="true">📲</span>
+          Panel del lector
+        </button>
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur lg:px-8">
@@ -114,6 +132,10 @@ export default function App() {
                 {s.nombre}
               </button>
             ))}
+            <button type="button" onClick={() => ir(LECTOR)} className="col-span-2 flex items-center justify-center gap-2 rounded-xl bg-spark px-3 py-3 text-sm font-extrabold text-brand-dark">
+              <span aria-hidden="true">📲</span>
+              Panel del lector
+            </button>
           </div>
         </div>
       )}
