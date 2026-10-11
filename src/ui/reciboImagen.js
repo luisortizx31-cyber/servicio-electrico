@@ -143,7 +143,7 @@ export function reciboComoImagen(datos) {
 // 'descargado' cuando el equipo no sabe compartir archivos (una
 // computadora): en ese caso baja el PNG para adjuntarlo a mano.
 //
-//  se llama justo antes de abrir el Compartir. Hace falta
+// `alAbrir` se llama justo antes de abrir el Compartir. Hace falta
 // porque NO se puede confiar en lo que el celular avisa después: al
 // volver de WhatsApp, Android a veces responde "cancelado" aunque el
 // recibo sí se mandó, o recarga la página y no responde nada (bug
