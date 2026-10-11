@@ -142,13 +142,20 @@ export function reciboComoImagen(datos) {
 // elige WhatsApp y el contacto). Devuelve 'compartido', 'cancelado', o
 // 'descargado' cuando el equipo no sabe compartir archivos (una
 // computadora): en ese caso baja el PNG para adjuntarlo a mano.
-export async function compartirRecibo(datos) {
+//
+//  se llama justo antes de abrir el Compartir. Hace falta
+// porque NO se puede confiar en lo que el celular avisa después: al
+// volver de WhatsApp, Android a veces responde "cancelado" aunque el
+// recibo sí se mandó, o recarga la página y no responde nada (bug
+// real, 2026-10-11: el recibo se enviaba pero no pasaba a Enviados).
+export async function compartirRecibo(datos, alAbrir) {
   const { recibo, usuario, periodo } = datos
   const blob = await reciboComoImagen(datos)
   const nombre = `recibo-${formatearNumeroRecibo(recibo.numero)}-Mz${usuario.mz}-Lt${usuario.lote}.png`
   const archivo = new File([blob], nombre, { type: 'image/png' })
 
   if (navigator.canShare?.({ files: [archivo] })) {
+    alAbrir?.()
     try {
       await navigator.share({ files: [archivo], text: `Recibo de luz de ${nombrePeriodo(periodo)} - ${usuario.nombre}` })
       return 'compartido'

@@ -5,8 +5,9 @@ import { compartirRecibo } from './reciboImagen'
 // Manda el recibo amarillo como imagen. WhatsApp no deja abrir un chat
 // con una foto ya adjunta (su enlace directo solo acepta texto), así
 // que se usa el "Compartir" del celular: ahí se elige WhatsApp y al
-// vecino. Recién cuando el celular confirma que se compartió queda
-// anotado como enviado.
+// vecino. Queda anotado como enviado apenas se abre el Compartir (ver
+// por qué en compartirRecibo); si al final no se mandó, se devuelve a
+// "Por enviar" con el enlace "No llegó a enviarse" de la ficha.
 export function BotonReciboImagen({ recibo, usuario, periodo, config, className = '' }) {
   const [ocupado, setOcupado] = useState(false)
   const [aviso, setAviso] = useState(null)
@@ -15,8 +16,7 @@ export function BotonReciboImagen({ recibo, usuario, periodo, config, className 
     setOcupado(true)
     setAviso(null)
     try {
-      const resultado = await compartirRecibo({ recibo, usuario, periodo, config })
-      if (resultado === 'compartido') marcarWhatsapp(recibo.id)
+      const resultado = await compartirRecibo({ recibo, usuario, periodo, config }, () => marcarWhatsapp(recibo.id))
       if (resultado === 'descargado') setAviso('Este equipo no puede compartir directo: se descargó la imagen del recibo para adjuntarla a mano.')
     } catch (err) {
       console.error('[BotonReciboImagen]', err)
