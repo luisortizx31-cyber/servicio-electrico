@@ -149,6 +149,10 @@ function Mini({ etiqueta, valor }) {
 
 function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
   const [fecha, setFecha] = useState(hoy)
+  // Elegir efectivo o Yape NO cobra todavía: primero pide confirmar,
+  // para que un toque de más no deje un recibo como pagado (pedido del
+  // usuario, 2026-10-11).
+  const [porConfirmar, setPorConfirmar] = useState(null) // null | 'efectivo' | 'yape'
   const periodo = recibo.periodo
   const whatsapp = linkWhatsapp(usuario.telefono, mensajeRecibo({ recibo, usuario, periodo, config }))
 
@@ -180,14 +184,37 @@ function DetalleRecibo({ recibo, usuario, config, hoy, onCerrar }) {
               className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-ink outline-none focus-visible:border-brand"
             />
           </div>
-          <div className="flex gap-2">
-            <Boton variante="exito" className="flex-1" onClick={() => registrarPago(recibo.id, { fecha: fecha || hoy, metodo: 'efectivo' })}>
-              💵 Efectivo
-            </Boton>
-            <Boton className="flex-1" onClick={() => registrarPago(recibo.id, { fecha: fecha || hoy, metodo: 'yape' })}>
-              📱 Yape
-            </Boton>
-          </div>
+          {porConfirmar ? (
+            <div className={`rounded-xl p-3 ${porConfirmar === 'yape' ? 'bg-brand-soft' : 'bg-success-soft'}`}>
+              <p className="text-sm font-bold text-ink">
+                ¿Confirmar pago por {porConfirmar === 'yape' ? 'Yape' : 'efectivo'} de <span className="money">{formatearMonto(recibo.total)}</span>?
+              </p>
+              <p className="text-xs text-ink-soft">
+                {usuario.nombre} · fecha de pago {formatearFecha(fecha || hoy)}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Boton variante="secundario" className="flex-1" onClick={() => setPorConfirmar(null)}>
+                  Cancelar
+                </Boton>
+                <Boton
+                  variante={porConfirmar === 'yape' ? 'primario' : 'exito'}
+                  className="flex-1"
+                  onClick={() => registrarPago(recibo.id, { fecha: fecha || hoy, metodo: porConfirmar })}
+                >
+                  ✓ Confirmar pago por {porConfirmar === 'yape' ? 'Yape' : 'efectivo'}
+                </Boton>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Boton variante="exito" className="flex-1" onClick={() => setPorConfirmar('efectivo')}>
+                💵 Efectivo
+              </Boton>
+              <Boton className="flex-1" onClick={() => setPorConfirmar('yape')}>
+                📱 Yape
+              </Boton>
+            </div>
+          )}
         </div>
       )}
 
