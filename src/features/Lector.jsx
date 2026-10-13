@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDatos } from '../data/useDatos'
-import { guardarLectura, emitirRecibos, marcarWhatsapp, guardarTelefono } from '../data/store'
+import { guardarLectura, emitirRecibos, marcarWhatsapp, guardarTelefono, cambiarEstadoUsuario } from '../data/store'
 import { calcularImporte, lecturaAnteriorDe, consumoPromedioDe, compararUbicacion } from '../domain/calculo'
 import { formatearMonto, formatearNumero, formatearNumeroRecibo } from '../domain/dinero'
 import { formatearFecha, nombrePeriodo } from '../domain/fecha'
@@ -26,11 +26,22 @@ import { BotonReciboPegar } from '../ui/BotonReciboPegar'
 //
 // "Deben" cuenta TODA la deuda del vecino, también la de meses
 // anteriores: el que cobra tiene que saber cuánto pedir en total.
+//
+// "Corte" junta a los que ya pasaron la fecha de corte sin pagar y a
+// los que ya tienen el servicio cortado: el lector también registra el
+// corte y la reconexión desde la calle (pedido del usuario, 2026-10-12).
 const PESTANAS = [
-  { id: 'leer', texto: 'Falta leer' },
+  { id: 'leer', texto: 'Leer' },
   { id: 'deben', texto: 'Deben' },
   { id: 'pagaron', texto: 'Pagaron' },
+  { id: 'corte', texto: 'Corte' },
 ]
+
+// Le toca corte: sigue con servicio y tiene algún recibo impago que ya
+// pasó su fecha de corte (misma regla que la pantalla Cortes).
+function paraCortar(fila) {
+  return fila.usuario.estado === 'activo' && Boolean(fila.deuda?.enCorte)
+}
 
 export default function Lector({ onSalir }) {
   const { estado, config, usuarios, periodoActual: periodo, recibos, deuda } = useDatos()
@@ -60,6 +71,8 @@ export default function Lector({ onSalir }) {
     deben: filas.filter((f) => f.deuda),
     // Pagó el recibo de este mes y no arrastra nada de meses anteriores.
     pagaron: filas.filter((f) => f.recibo?.pago && !f.deuda),
+    // Primero los que toca cortar, después los ya cortados.
+    corte: [...filas.filter((f) => paraCortar(f)), ...filas.filter((f) => f.usuario.estado === 'cortado')],
   }
   const sumar = (lista, valor) => Math.round(lista.reduce((t, x) => t + valor(x), 0) * 100) / 100
   const totalDeuda = sumar(grupos.deben, (f) => f.deuda.total)
@@ -113,17 +126,17 @@ export default function Lector({ onSalir }) {
       <Buscador value={busqueda} onChange={setBusqueda} placeholder="Buscar lote (B33), nombre o medidor…" />
 
       {!texto && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {PESTANAS.map((p) => (
             <button
               key={p.id}
               type="button"
               onClick={() => setPestana(p.id)}
               aria-pressed={pestana === p.id}
-              className={`rounded-xl px-2 py-2.5 text-xs font-bold ${pestana === p.id ? 'bg-brand text-white' : 'border border-line bg-surface text-ink-soft'}`}
+              className={`rounded-xl px-1 py-2 text-xs font-bold ${pestana === p.id ? 'bg-brand text-white' : 'border border-line bg-surface text-ink-soft'}`}
             >
-              {p.texto}
-              <span className={`money ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${pestana === p.id ? 'bg-white/20' : 'bg-paper'}`}>{grupos[p.id].length}</span>
+              <span className="block">{p.texto}</span>
+              <span className={`money mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] ${pestana === p.id ? 'bg-white/20' : 'bg-paper'}`}>{grupos[p.id].length}</span>
             </button>
           ))}
         </div>
@@ -137,7 +150,9 @@ export default function Lector({ onSalir }) {
               ? '¡Listo! Ya se leyeron todos los medidores.'
               : pestana === 'deben'
                 ? 'Nadie debe nada. 🎉'
-                : 'Todavía no pagó nadie de este mes.'}
+                : pestana === 'pagaron'
+                  ? 'Todavía no pagó nadie de este mes.'
+                  : 'Nadie pasó la fecha de corte y no hay servicios cortados.'}
         </Vacio>
       ) : (
         <ul className="space-y-2">
@@ -154,6 +169,11 @@ export default function Lector({ onSalir }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{f.usuario.nombre}</p>
+                  {f.usuario.estado === 'cortado' ? (
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-danger">✕ Servicio cortado</p>
+                  ) : (
+                    paraCortar(f) && <p className="text-[10px] font-bold uppercase tracking-wide text-danger">✂ Le toca corte</p>
+                  )}
                   <p className="truncate text-xs text-ink-soft">
                     {f.recibo ? (
                       f.recibo.whatsapp ? (
@@ -256,6 +276,8 @@ function Ficha({ fila, periodo, config, anterior, promedio, onCerrar }) {
         <EnviarRecibo recibo={recibo} usuario={usuario} periodo={periodo} config={config} onCorregir={() => setCorrigiendo(true)} onCerrar={onCerrar} />
       )}
 
+      <CorteServicio fila={fila} />
+
       {atrasados.length > 0 && (
         <div className="mt-5">
           <Titulo>Debe de meses anteriores</Titulo>
@@ -275,6 +297,51 @@ function Ficha({ fila, periodo, config, anterior, promedio, onCerrar }) {
         </div>
       )}
     </Modal>
+  )
+}
+
+// El sistema solo lleva el registro: cortar y reconectar el servicio
+// lo hace la persona en el poste.
+function CorteServicio({ fila }) {
+  const { usuario, deuda } = fila
+
+  if (usuario.estado === 'cortado') {
+    function reconectar() {
+      if (deuda && !confirm(`${usuario.nombre} todavía debe ${formatearMonto(deuda.total)}. ¿Reconectar igual?`)) return
+      cambiarEstadoUsuario(usuario.id, 'activo')
+    }
+    return (
+      <div className="mt-5">
+        <Titulo>Corte del servicio</Titulo>
+        <div className="rounded-xl border border-danger/30 bg-danger-soft/40 p-3">
+          <p className="text-sm font-bold text-danger">✕ Este lote tiene el servicio cortado</p>
+          <p className="mt-0.5 text-xs text-ink-soft">{deuda ? `Todavía debe ${formatearMonto(deuda.total)}.` : 'Ya no debe nada: se puede reconectar.'}</p>
+          <Boton variante={deuda ? 'secundario' : 'exito'} className="mt-3 w-full" onClick={reconectar}>
+            🔌 Registrar reconexión
+          </Boton>
+        </div>
+      </div>
+    )
+  }
+
+  if (!paraCortar(fila)) return null
+  return (
+    <div className="mt-5">
+      <Titulo>Corte del servicio</Titulo>
+      <div className="rounded-xl border border-danger/30 bg-danger-soft/40 p-3">
+        <p className="text-sm font-bold text-danger">✂ Pasó la fecha de corte sin pagar</p>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          Debe {formatearMonto(deuda.total)} ({deuda.recibos.map((r) => nombrePeriodo(r.periodo)).join(', ')}).
+        </p>
+        <Boton
+          variante="peligro"
+          className="mt-3 w-full"
+          onClick={() => confirm(`¿Registrar el corte del servicio de ${usuario.nombre} (Mz ${usuario.mz} Lt ${usuario.lote})?`) && cambiarEstadoUsuario(usuario.id, 'cortado')}
+        >
+          ✂️ Registrar corte del servicio
+        </Boton>
+      </div>
+    </div>
   )
 }
 
