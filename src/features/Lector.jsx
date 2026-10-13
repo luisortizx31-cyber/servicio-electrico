@@ -5,7 +5,7 @@ import { calcularImporte, lecturaAnteriorDe, consumoPromedioDe, compararUbicacio
 import { formatearMonto, formatearNumero, formatearNumeroRecibo } from '../domain/dinero'
 import { formatearFecha, nombrePeriodo } from '../domain/fecha'
 import { linkWhatsapp, mensajeRecibo } from '../domain/whatsapp'
-import { Boton, Buscador, Modal, Vacio } from '../ui/base'
+import { Boton, Buscador, Insignia, Modal, Titulo, Vacio } from '../ui/base'
 import { ReciboPapel } from '../ui/ReciboPapel'
 import { BotonReciboImagen } from '../ui/BotonReciboImagen'
 import { CobroRecibo } from '../ui/CobroRecibo'
@@ -18,21 +18,25 @@ import { BotonReciboPegar } from '../ui/BotonReciboPegar'
 //   buscar el lote -> anotar la lectura -> se emite su recibo ->
 //   mandarlo por WhatsApp (y cobrarlo ahí mismo, si el vecino paga)
 //
-// y tres listas para no perderse: a quién falta leer, a quién ya se le
-// leyó pero falta mandarle el recibo ("Por enviar" - un usuario recién
-// entra acá cuando se le toma la lectura), y a quién ya se le mandó,
-// con la fecha y la opción de reenviar.
+// y tres listas, ordenadas por lo que más importa en la calle: a quién
+// falta leer, QUIÉN DEBE y quién ya pagó (pedido del usuario,
+// 2026-10-12: "más importante es saber quién falta pagar y quién
+// debe"). Si el recibo ya se mandó por WhatsApp o no, pasó a ser un
+// dato de cada fila, no una lista aparte.
+//
+// "Deben" cuenta TODA la deuda del vecino, también la de meses
+// anteriores: el que cobra tiene que saber cuánto pedir en total.
 const PESTANAS = [
   { id: 'leer', texto: 'Falta leer' },
-  { id: 'enviar', texto: 'Por enviar' },
-  { id: 'enviados', texto: 'Enviados' },
+  { id: 'deben', texto: 'Deben' },
+  { id: 'pagaron', texto: 'Pagaron' },
 ]
 
 export default function Lector({ onSalir }) {
-  const { estado, config, usuarios, periodoActual: periodo, recibos } = useDatos()
-  // Arranca en lo que hay por hacer: si ya se leyó todo, en los recibos por enviar.
+  const { estado, config, usuarios, periodoActual: periodo, recibos, deuda } = useDatos()
+  // Arranca en lo que hay por hacer: si ya se leyó todo, en los que deben.
   const [pestana, setPestana] = useState(() =>
-    periodo && usuarios.some((u) => u.estado !== 'retirado' && periodo.lecturas?.[u.id] == null) ? 'leer' : 'enviar'
+    periodo && usuarios.some((u) => u.estado !== 'retirado' && periodo.lecturas?.[u.id] == null) ? 'leer' : 'deben'
   )
   const [busqueda, setBusqueda] = useState('')
   const [abiertoId, setAbiertoId] = useState(null) // usuarioId
@@ -49,16 +53,19 @@ export default function Lector({ onSalir }) {
   const filas = usuarios
     .filter((u) => u.estado !== 'retirado')
     .sort(compararUbicacion)
-    .map((u) => ({ usuario: u, actual: periodo.lecturas?.[u.id] ?? null, recibo: recibosDelPeriodo.get(u.id) }))
+    .map((u) => ({ usuario: u, actual: periodo.lecturas?.[u.id] ?? null, recibo: recibosDelPeriodo.get(u.id), deuda: deuda.get(u.id) ?? null }))
 
   const grupos = {
     leer: filas.filter((f) => f.actual == null),
-    enviar: filas.filter((f) => f.actual != null && !f.recibo?.whatsapp),
-    // Lo último que se mandó, arriba.
-    enviados: filas
-      .filter((f) => f.recibo?.whatsapp)
-      .sort((a, b) => `${b.recibo.whatsapp.fecha} ${b.recibo.whatsapp.hora}`.localeCompare(`${a.recibo.whatsapp.fecha} ${a.recibo.whatsapp.hora}`)),
+    deben: filas.filter((f) => f.deuda),
+    // Pagó el recibo de este mes y no arrastra nada de meses anteriores.
+    pagaron: filas.filter((f) => f.recibo?.pago && !f.deuda),
   }
+  const sumar = (lista, valor) => Math.round(lista.reduce((t, x) => t + valor(x), 0) * 100) / 100
+  const totalDeuda = sumar(grupos.deben, (f) => f.deuda.total)
+  const delMes = filas.filter((f) => f.recibo)
+  const cobradoDelMes = sumar(delMes.filter((f) => f.recibo.pago), (f) => f.recibo.total)
+  const sinEnviar = delMes.filter((f) => !f.recibo.whatsapp).length
 
   // Con algo escrito en el buscador se busca en TODOS, sin importar la
   // pestaña: en la calle se busca un lote, no en qué lista está.
@@ -82,10 +89,24 @@ export default function Lector({ onSalir }) {
           <p className="text-sm font-bold">
             {leidos} de {filas.length} medidores leídos
           </p>
-          <p className="text-xs text-white/70">{grupos.enviados.length} recibos enviados</p>
+          <p className="text-xs text-white/70">
+            {sinEnviar > 0 ? `${sinEnviar} recibos sin enviar` : 'recibos enviados ✓'}
+          </p>
         </div>
         <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15" role="img" aria-label={`${leidos} de ${filas.length}`}>
           <div className="h-full rounded-full bg-spark" style={{ width: `${filas.length ? (leidos / filas.length) * 100 : 0}%` }} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-white/10 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Falta cobrar</p>
+            <p className="money text-lg font-extrabold">{formatearMonto(totalDeuda)}</p>
+            <p className="text-[10px] text-white/70">{grupos.deben.length} deben</p>
+          </div>
+          <div className="rounded-xl bg-white/10 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Cobrado del mes</p>
+            <p className="money text-lg font-extrabold">{formatearMonto(cobradoDelMes)}</p>
+            <p className="text-[10px] text-white/70">{delMes.filter((f) => f.recibo.pago).length} pagaron</p>
+          </div>
         </div>
       </div>
 
@@ -114,9 +135,9 @@ export default function Lector({ onSalir }) {
             ? 'Ningún lote coincide.'
             : pestana === 'leer'
               ? '¡Listo! Ya se leyeron todos los medidores.'
-              : pestana === 'enviar'
-                ? 'No hay recibos por enviar. Aparecen aquí apenas se toma la lectura.'
-                : 'Todavía no se envió ningún recibo.'}
+              : pestana === 'deben'
+                ? 'Nadie debe nada. 🎉'
+                : 'Todavía no pagó nadie de este mes.'}
         </Vacio>
       ) : (
         <ul className="space-y-2">
@@ -134,23 +155,34 @@ export default function Lector({ onSalir }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{f.usuario.nombre}</p>
                   <p className="truncate text-xs text-ink-soft">
-                    {f.recibo?.whatsapp ? (
-                      <>✓ Enviado el {formatearFecha(f.recibo.whatsapp.fecha)} a las {f.recibo.whatsapp.hora}</>
-                    ) : f.actual != null ? (
-                      <>Leído: <span className="money">{formatearNumero(f.actual)}</span> · falta enviar el recibo</>
+                    {f.recibo ? (
+                      f.recibo.whatsapp ? (
+                        <>✓ Recibo enviado el {formatearFecha(f.recibo.whatsapp.fecha)}</>
+                      ) : (
+                        <span className="font-semibold text-warning">⚠ Falta enviarle el recibo</span>
+                      )
                     ) : (
-                      <>Medidor <span className="money">{f.usuario.medidor}</span></>
+                      <>Falta leer · medidor <span className="money">{f.usuario.medidor}</span></>
                     )}
                   </p>
                 </div>
-                {f.recibo ? (
-                  <span className="shrink-0 text-right">
-                    <span className="money block text-sm font-extrabold text-ink">{formatearMonto(f.recibo.total)}</span>
-                    {f.recibo.pago && <span className="block text-[10px] font-bold uppercase text-success">✓ Pagado</span>}
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-amber-soft px-2.5 py-1 text-[10px] font-bold uppercase text-amber">Leer</span>
-                )}
+                <span className="shrink-0 text-right">
+                  {f.deuda ? (
+                    <>
+                      <span className="money block text-sm font-extrabold text-danger">{formatearMonto(f.deuda.total)}</span>
+                      <span className="block text-[10px] font-bold uppercase text-danger">
+                        ✕ Debe{f.deuda.recibos.length > 1 ? ` ${f.deuda.recibos.length} recibos` : ''}
+                      </span>
+                    </>
+                  ) : f.recibo ? (
+                    <>
+                      <span className="money block text-sm font-extrabold text-ink">{formatearMonto(f.recibo.total)}</span>
+                      <span className="block text-[10px] font-bold uppercase text-success">✓ Pagó</span>
+                    </>
+                  ) : (
+                    <span className="rounded-full bg-amber-soft px-2.5 py-1 text-[10px] font-bold uppercase text-amber">Leer</span>
+                  )}
+                </span>
               </button>
             </li>
           ))}
@@ -193,14 +225,22 @@ function Marco({ titulo, subtitulo, onSalir, children }) {
   )
 }
 
-// Un lote: primero la lectura; una vez guardada, su recibo y el envío.
+// Un lote: primero la lectura; una vez guardada, su recibo, el cobro y
+// el envío. Abajo, lo que arrastra de meses anteriores, para cobrarlo
+// en la misma visita.
 function Ficha({ fila, periodo, config, anterior, promedio, onCerrar }) {
-  const { usuario, actual, recibo } = fila
+  const { usuario, actual, recibo, deuda } = fila
   const [corrigiendo, setCorrigiendo] = useState(false)
   const leyendo = actual == null || !recibo || corrigiendo
+  const atrasados = (deuda?.recibos ?? []).filter((r) => r.periodoId !== periodo.id).sort((a, b) => a.periodoId.localeCompare(b.periodoId))
 
   return (
     <Modal titulo={`Mz ${usuario.mz} · Lote ${usuario.lote}`} subtitulo={`${usuario.nombre} · Medidor ${usuario.medidor}`} onCerrar={onCerrar}>
+      {atrasados.length > 0 && (
+        <p className="mb-3 rounded-xl bg-danger-soft px-3 py-2.5 text-sm font-bold text-danger">
+          ✕ Debe en total <span className="money">{formatearMonto(deuda.total)}</span> · {deuda.recibos.length} recibos (el detalle de los meses anteriores está abajo)
+        </p>
+      )}
       {leyendo ? (
         <TomarLectura
           usuario={usuario}
@@ -214,6 +254,25 @@ function Ficha({ fila, periodo, config, anterior, promedio, onCerrar }) {
         />
       ) : (
         <EnviarRecibo recibo={recibo} usuario={usuario} periodo={periodo} config={config} onCorregir={() => setCorrigiendo(true)} onCerrar={onCerrar} />
+      )}
+
+      {atrasados.length > 0 && (
+        <div className="mt-5">
+          <Titulo>Debe de meses anteriores</Titulo>
+          <div className="space-y-3">
+            {atrasados.map((r) => (
+              <div key={r.id} className="rounded-xl border border-danger/30 bg-danger-soft/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-ink">
+                    {nombrePeriodo(r.periodo)} <span className="money text-xs font-normal text-ink-soft">N° {formatearNumeroRecibo(r.numero)}</span>
+                  </p>
+                  <Insignia estado={r.estado} />
+                </div>
+                <CobroRecibo recibo={r} usuario={usuario} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </Modal>
   )
@@ -308,6 +367,8 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
       <p className="rounded-lg bg-success-soft px-3 py-2 text-sm font-bold text-success">✓ Recibo N° {formatearNumeroRecibo(recibo.numero)} emitido</p>
       <ReciboPapel recibo={recibo} usuario={usuario} periodo={periodo} config={config} />
 
+      <CobroRecibo recibo={recibo} usuario={usuario} />
+
       {enviado && (
         <div className="rounded-xl border border-line bg-surface px-3 py-2 text-xs text-ink-soft">
           <p className="font-bold text-ink">
@@ -315,7 +376,7 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
             {enviado.veces > 1 ? ` (${enviado.veces} veces)` : ''}
           </p>
           <button type="button" onClick={() => marcarWhatsapp(recibo.id, false)} className="mt-0.5 underline decoration-dotted">
-            No llegó a enviarse: devolver a "Por enviar"
+            No llegó a enviarse: marcar como no enviado
           </button>
         </div>
       )}
@@ -368,8 +429,6 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
           </div>
         </form>
       )}
-
-      <CobroRecibo recibo={recibo} usuario={usuario} />
 
       <Boton variante="secundario" className="w-full py-3" onClick={onCerrar}>
         Siguiente lote →
