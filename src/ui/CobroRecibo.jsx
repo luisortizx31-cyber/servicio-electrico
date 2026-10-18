@@ -12,20 +12,38 @@ export function CobroRecibo({ recibo, usuario }) {
   const hoy = hoyISO()
   const [fecha, setFecha] = useState(hoy)
   const [porConfirmar, setPorConfirmar] = useState(null) // null | 'efectivo' | 'yape'
+  // Recién cobrado en esta pantalla: aviso grande de éxito (pedido del
+  // usuario, 2026-10-17).
+  const [recienPagado, setRecienPagado] = useState(false)
 
   if (recibo.pago) {
     return (
-      <div className="rounded-xl bg-success-soft p-3 text-sm text-success">
-        <p className="font-bold">
-          ✓ Pagado el {formatearFecha(recibo.pago.fecha)} · {recibo.pago.metodo === 'yape' ? 'Yape' : 'Efectivo'}
-        </p>
-        <button
-          type="button"
-          onClick={() => confirm('¿Anular este pago? El recibo vuelve a quedar como pendiente.') && anularPago(recibo.id)}
-          className="mt-1 text-xs underline decoration-dotted"
-        >
-          Anular pago (se registró por error)
-        </button>
+      <div className="space-y-2">
+        {recienPagado && (
+          <div role="status" className="rounded-xl bg-success p-4 text-center text-white shadow-md">
+            <p className="text-3xl leading-none" aria-hidden="true">✅</p>
+            <p className="mt-1 text-base font-extrabold">¡Pago realizado con éxito!</p>
+            <p className="text-sm text-white/90">
+              <span className="money font-bold">{formatearMonto(recibo.total)}</span> por {recibo.pago.metodo === 'yape' ? 'Yape' : 'efectivo'} · {usuario.nombre}
+            </p>
+          </div>
+        )}
+        <div className="rounded-xl bg-success-soft p-3 text-sm text-success">
+          <p className="font-bold">
+            ✓ Pagado el {formatearFecha(recibo.pago.fecha)} · {recibo.pago.metodo === 'yape' ? 'Yape' : 'Efectivo'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirm('¿Anular este pago? El recibo vuelve a quedar como pendiente.')) return
+              anularPago(recibo.id)
+              setRecienPagado(false)
+            }}
+            className="mt-1 text-xs underline decoration-dotted"
+          >
+            Anular pago (se registró por error)
+          </button>
+        </div>
       </div>
     )
   }
@@ -59,7 +77,11 @@ export function CobroRecibo({ recibo, usuario }) {
             <Boton
               variante={porConfirmar === 'yape' ? 'primario' : 'exito'}
               className="flex-1"
-              onClick={() => registrarPago(recibo.id, { fecha: fecha || hoy, metodo: porConfirmar })}
+              onClick={() => {
+                registrarPago(recibo.id, { fecha: fecha || hoy, metodo: porConfirmar })
+                setRecienPagado(true)
+                setPorConfirmar(null)
+              }}
             >
               ✓ Confirmar pago por {nombreMetodo}
             </Boton>
