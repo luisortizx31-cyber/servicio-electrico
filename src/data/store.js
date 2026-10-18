@@ -39,6 +39,12 @@ export const CONFIG_INICIAL = {
   diaVencimiento: 20,
   diaCorte: 21,
   siguienteNumero: 1,
+  // A dónde pagan los vecinos (ver domain/pago.js).
+  pagoMedio: 'yape',
+  pagoNumero: '',
+  pagoTitular: '',
+  pagoDesde: '08:00',
+  pagoHasta: '20:00',
 }
 
 function nuevoId() {
@@ -293,14 +299,21 @@ export function emitirRecibos(periodoId, soloUsuarioId) {
 // hay forma de saber si de verdad tocó "Enviar" dentro de WhatsApp,
 // así que es un registro de a quién ya se le mandó, no una
 // confirmación de entrega - por eso se puede desmarcar.
-export function marcarWhatsapp(reciboId, enviado = true) {
+//
+// Un recibo YA PAGADO se anota aparte, en `whatsappPagado` (pedido del
+// usuario, 2026-10-17: si al vecino se le mandó el recibo sin pagar y
+// después paga, que se pueda mandar el recibo pagado). `pagado` por
+// defecto: si el recibo tiene pago.
+export function marcarWhatsapp(reciboId, enviado = true, { pagado } = {}) {
   const ahora = new Date()
   const hora = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
   fijar({
     ...estado,
-    recibos: estado.recibos.map((r) =>
-      r.id === reciboId ? { ...r, whatsapp: enviado ? { fecha: hoyISO(), hora, veces: (r.whatsapp?.veces || 0) + 1 } : null } : r
-    ),
+    recibos: estado.recibos.map((r) => {
+      if (r.id !== reciboId) return r
+      const campo = (pagado ?? Boolean(r.pago)) ? 'whatsappPagado' : 'whatsapp'
+      return { ...r, [campo]: enviado ? { fecha: hoyISO(), hora, veces: (r[campo]?.veces || 0) + 1 } : null }
+    }),
   })
 }
 
@@ -314,5 +327,5 @@ export function registrarPago(reciboId, { fecha, metodo }) {
 }
 
 export function anularPago(reciboId) {
-  fijar({ ...estado, recibos: estado.recibos.map((r) => (r.id === reciboId ? { ...r, pago: null } : r)) })
+  fijar({ ...estado, recibos: estado.recibos.map((r) => (r.id === reciboId ? { ...r, pago: null, whatsappPagado: null } : r)) })
 }

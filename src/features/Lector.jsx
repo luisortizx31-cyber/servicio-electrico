@@ -291,6 +291,11 @@ function Ficha({ fila, periodo, config, anterior, promedio, onCerrar }) {
                   <Insignia estado={r.estado} />
                 </div>
                 <CobroRecibo recibo={r} usuario={usuario} />
+                {r.pago && (
+                  <div className="mt-2">
+                    <BotonReciboImagen recibo={r} usuario={usuario} periodo={r.periodo} config={config} className="border border-success/40 bg-success-soft px-4 py-3 text-sm text-success" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -442,7 +447,7 @@ function EnviarRecibo({ recibo, usuario, periodo, config, onCorregir, onCerrar }
             ✓ Enviado por WhatsApp el {formatearFecha(enviado.fecha)} a las {enviado.hora}
             {enviado.veces > 1 ? ` (${enviado.veces} veces)` : ''}
           </p>
-          <button type="button" onClick={() => marcarWhatsapp(recibo.id, false)} className="mt-0.5 underline decoration-dotted">
+          <button type="button" onClick={() => marcarWhatsapp(recibo.id, false, { pagado: false })} className="mt-0.5 underline decoration-dotted">
             No llegó a enviarse: marcar como no enviado
           </button>
         </div>

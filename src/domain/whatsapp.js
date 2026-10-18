@@ -1,4 +1,5 @@
 import { formatearFecha, nombrePeriodo } from './fecha.js'
+import { lineasPago } from './pago.js'
 import { formatearMonto, formatearNumero, formatearNumeroRecibo } from './dinero.js'
 
 // Abre WhatsApp con el mensaje ya escrito (no hay forma de mandarlo
@@ -28,7 +29,7 @@ export function mensajeRecibo({ recibo, usuario, periodo, config }) {
   if (recibo.pago) {
     lineas.push(`PAGADO el ${formatearFecha(recibo.pago.fecha)}. Gracias.`)
   } else {
-    lineas.push(`Vence: ${formatearFecha(periodo.fechaVencimiento)}`, `Corte: ${formatearFecha(periodo.fechaCorte)}`)
+    lineas.push(`Vence: ${formatearFecha(periodo.fechaVencimiento)}`, `Corte: ${formatearFecha(periodo.fechaCorte)}`, ...lineasPago(config))
   }
   return lineas.join('\n')
 }
@@ -45,5 +46,6 @@ export function mensajeDeuda({ usuario, deuda, config }) {
     '',
     `*Total adeudado: ${formatearMonto(deuda.total)}*`,
     'Le pedimos regularizar su pago para evitar el corte del servicio.',
+    ...lineasPago(config),
   ].join('\n')
 }

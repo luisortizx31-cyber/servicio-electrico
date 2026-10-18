@@ -1,12 +1,19 @@
 import { formatearFecha, MESES_CORTOS, nombrePeriodo } from '../domain/fecha'
 import { formatearNumero, formatearNumeroRecibo } from '../domain/dinero'
+import { datosPago, textoCaptura } from '../domain/pago'
 
 // El recibo amarillo como IMAGEN (PNG), para mandarlo por WhatsApp
 // igual al de papel (pedido del usuario, 2026-10-11). Se dibuja a mano
 // en un canvas, con los mismos casilleros que ReciboPapel.jsx - sin
 // librerías, así sale idéntico en cualquier celular.
 const ANCHO = 1000
-const ALTO = 690
+const ALTO_BASE = 690
+// Con los datos para yapear abajo, el recibo es más alto.
+const ALTO_CON_PAGO = 800
+
+function pagoDe({ recibo, config }) {
+  return recibo.pago ? null : datosPago(config)
+}
 const TINTA = '#1c2f86'
 const PAPEL = '#f6f3ae'
 const ROJO = '#b3261e'
@@ -60,6 +67,8 @@ function tabla(ctx, x, y, w, altoFila, corte, filas) {
 }
 
 function dibujar(ctx, { recibo, usuario, periodo, config }) {
+  const pago = pagoDe({ recibo, config })
+  const ALTO = pago ? ALTO_CON_PAGO : ALTO_BASE
   ctx.fillStyle = PAPEL
   ctx.fillRect(0, 0, ANCHO, ALTO)
   caja(ctx, 10, 10, ANCHO - 20, ALTO - 20, 3)
@@ -116,6 +125,18 @@ function dibujar(ctx, { recibo, usuario, periodo, config }) {
 
   texto(ctx, 'TESORERÍA', 966, ALTO - 44, { tam: 15, alinear: 'right' })
 
+  // A dónde yapear (ver domain/pago.js)
+  if (pago) {
+    const yP = 640
+    caja(ctx, 34, yP, 760, 118, 3)
+    texto(ctx, `PAGA POR ${pago.medio.toUpperCase()}:`, 50, yP + 28, { tam: 20, peso: 800 })
+    ctx.font = `800 20px ${SANS}`
+    const anchoEtiqueta = ctx.measureText(`PAGA POR ${pago.medio.toUpperCase()}:`).width
+    texto(ctx, pago.numero, 50 + anchoEtiqueta + 14, yP + 28, { tam: 30, peso: 800, fuente: MONO })
+    if (pago.titular) texto(ctx, `A nombre de: ${pago.titular}`, 50, yP + 64, { tam: 20, ancho: 728 })
+    texto(ctx, textoCaptura(pago, 'Envía la captura a este número'), 50, yP + (pago.titular ? 96 : 68), { tam: 17, peso: 600, ancho: 728 })
+  }
+
   if (recibo.pago) {
     ctx.save()
     ctx.translate(250, ALTO - 44)
@@ -131,7 +152,7 @@ function dibujar(ctx, { recibo, usuario, periodo, config }) {
 export function reciboComoImagen(datos) {
   const canvas = document.createElement('canvas')
   canvas.width = ANCHO
-  canvas.height = ALTO
+  canvas.height = pagoDe(datos) ? ALTO_CON_PAGO : ALTO_BASE
   dibujar(canvas.getContext('2d'), datos)
   return new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar la imagen del recibo.'))), 'image/png')

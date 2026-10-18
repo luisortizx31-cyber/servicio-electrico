@@ -1,5 +1,6 @@
 import { formatearFecha, MESES_CORTOS } from '../domain/fecha'
 import { formatearNumero, formatearNumeroRecibo } from '../domain/dinero'
+import { datosPago, textoCaptura } from '../domain/pago'
 
 // El recibo tal como es el talonario de papel del comité (mismos
 // casilleros, tinta azul sobre amarillo) - así lo que se imprime o se
@@ -71,7 +72,25 @@ export function ReciboPapel({ recibo, usuario, periodo, config }) {
           </div>
         </div>
       </div>
-      <p className="mt-3 text-right text-[9px] font-bold uppercase tracking-widest">Tesorería</p>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <CuadroPago recibo={recibo} config={config} />
+        <p className="ml-auto shrink-0 text-[9px] font-bold uppercase tracking-widest">Tesorería</p>
+      </div>
+    </div>
+  )
+}
+
+// A dónde yapear (ver domain/pago.js). Solo en un recibo sin pagar.
+function CuadroPago({ recibo, config }) {
+  const p = datosPago(config)
+  if (recibo.pago || !p) return null
+  return (
+    <div className="min-w-0 rounded border-2 border-recibo-tinta/70 px-2 py-1 leading-tight">
+      <p className="text-[10px] font-extrabold uppercase">
+        Paga por {p.medio}: <span className="money text-[13px]">{p.numero}</span>
+      </p>
+      {p.titular && <p className="truncate text-[10px] font-bold">A nombre de: {p.titular}</p>}
+      <p className="text-[9px] font-semibold">{textoCaptura(p, 'Envía la captura a este número')}</p>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useDatos } from '../data/useDatos'
 import { guardarConfig, exportarCopia, importarCopia, borrarTodo } from '../data/store'
 import { formatearNumeroRecibo } from '../domain/dinero'
+import { MEDIOS_PAGO, lineasPago } from '../domain/pago'
 import { Boton, Campo, Tarjeta, Titulo } from '../ui/base'
 
 export default function Ajustes() {
@@ -11,7 +12,7 @@ export default function Ajustes() {
   const [error, setError] = useState(null)
   const archivoRef = useRef(null)
   const campo = (nombre) => ({
-    value: datos[nombre],
+    value: datos[nombre] ?? '',
     onChange: (e) => {
       setDatos((d) => ({ ...d, [nombre]: e.target.value }))
       setAviso(null)
@@ -33,6 +34,11 @@ export default function Ajustes() {
       diaVencimiento: Math.min(31, numero('diaVencimiento', 1)),
       diaCorte: Math.min(31, numero('diaCorte', 1)),
       siguienteNumero: Math.round(numero('siguienteNumero', 1)),
+      pagoMedio: datos.pagoMedio || 'yape',
+      pagoNumero: String(datos.pagoNumero || '').replace(/[^\d+ ]/g, '').trim(),
+      pagoTitular: (datos.pagoTitular || '').trim(),
+      pagoDesde: datos.pagoDesde || '',
+      pagoHasta: datos.pagoHasta || '',
     })
     setAviso('Guardado.')
   }
@@ -114,6 +120,43 @@ export default function Ajustes() {
               ayuda={`El próximo recibo que se emita será el N° ${formatearNumeroRecibo(Number(datos.siguienteNumero) || 1)}. Ponlo para continuar la numeración del talonario.`}
               {...campo('siguienteNumero')}
             />
+          </Tarjeta>
+        </div>
+
+        <div>
+          <Titulo>Pago por Yape / Plin</Titulo>
+          <Tarjeta className="space-y-3 p-4">
+            <p className="text-[11px] text-ink-soft">Estos datos salen en el mensaje de WhatsApp y en el recibo de los que todavía no pagaron, para que sepan a dónde yapear.</p>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-ink-soft">¿Por dónde pagan?</span>
+              <select {...campo('pagoMedio')} className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none focus-visible:border-brand">
+                {MEDIOS_PAGO.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.texto}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Campo etiqueta="Número de celular" type="tel" inputMode="numeric" placeholder="987 654 321" {...campo('pagoNumero')} />
+            <Campo
+              etiqueta="Nombre completo del encargado de los cobros"
+              placeholder="Como aparece en Yape / Plin"
+              ayuda="Así el vecino comprueba que está pagando a la persona correcta."
+              {...campo('pagoTitular')}
+            />
+            <div>
+              <span className="mb-1 block text-xs font-semibold text-ink-soft">Horario para mandar la captura del pago</span>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo etiqueta="Desde" type="time" {...campo('pagoDesde')} />
+                <Campo etiqueta="Hasta" type="time" {...campo('pagoHasta')} />
+              </div>
+            </div>
+            {lineasPago(datos).length > 0 && (
+              <div className="rounded-lg border border-line bg-paper p-3">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft">Así lo verá el vecino</p>
+                <p className="whitespace-pre-line text-sm text-ink">{lineasPago(datos).slice(1).join('\n').replace(/\*/g, '')}</p>
+              </div>
+            )}
           </Tarjeta>
         </div>
 
