@@ -7,9 +7,10 @@ import { datosPago, textoCaptura } from '../domain/pago'
 // en un canvas, con los mismos casilleros que ReciboPapel.jsx - sin
 // librerías, así sale idéntico en cualquier celular.
 const ANCHO = 1000
-const ALTO_BASE = 690
+const ALTO_BASE = 750
 // Con los datos para yapear abajo, el recibo es más alto.
-const ALTO_CON_PAGO = 800
+const ALTO_CON_PAGO = 860
+const RESALTE = 'rgba(28, 47, 134, 0.15)'
 
 function pagoDe({ recibo, config }) {
   return recibo.pago ? null : datosPago(config)
@@ -55,7 +56,10 @@ function linea(ctx, x1, y1, x2, y2, grosor = 2) {
 }
 
 // Tabla de filas "etiqueta | valor" con una raya vertical en `corte`.
-function tabla(ctx, x, y, w, altoFila, corte, filas) {
+// `resaltadas`: índices de filas con fondo (diferencia y coeficiente).
+function tabla(ctx, x, y, w, altoFila, corte, filas, resaltadas = []) {
+  ctx.fillStyle = RESALTE
+  for (const i of resaltadas) ctx.fillRect(x, y + altoFila * i, w, altoFila)
   caja(ctx, x, y, w, altoFila * filas.length)
   linea(ctx, x + corte, y, x + corte, y + altoFila * filas.length)
   filas.forEach(([etiqueta, valor], i) => {
@@ -105,7 +109,7 @@ function dibujar(ctx, { recibo, usuario, periodo, config }) {
     ['Fecha lectura', formatearFecha(periodo.fechaLectura)],
     ['Fecha vencimiento', formatearFecha(periodo.fechaVencimiento)],
     ['Fecha corte', formatearFecha(periodo.fechaCorte)],
-  ])
+  ], [3])
 
   // Importe (derecha)
   const xD = 514
@@ -117,17 +121,30 @@ function dibujar(ctx, { recibo, usuario, periodo, config }) {
     ['Energía perdida', dinero(recibo.energiaPerdida)],
     ['Comisión comité control eléctrico', dinero(recibo.comision)],
     ['Mantenimiento, reparación, otros', dinero(recibo.mantenimiento)],
-  ])
+  ], [0])
   const yTotal = yT + fila * 6
   caja(ctx, xD, yTotal, 452, fila, 4)
   texto(ctx, 'TOTAL A PAGAR', xD + 12, yTotal + fila / 2, { tam: 19, peso: 800 })
   texto(ctx, `S/ ${formatearNumero(recibo.total, 2)}`, xD + 440, yTotal + fila / 2, { tam: 32, peso: 800, fuente: MONO, alinear: 'right' })
 
+  // La cuenta del consumo, escrita
+  const yC = yT + fila * 7 + 16
+  ctx.fillStyle = 'rgba(28, 47, 134, 0.10)'
+  ctx.fillRect(34, yC, 932, 46)
+  caja(ctx, 34, yC, 932, 46, 3)
+  texto(
+    ctx,
+    `CONSUMO:  ${formatearNumero(recibo.consumo)} kWh  ×  ${formatearNumero(periodo.coeficiente, 2)} (coef.)  =  S/ ${formatearNumero(recibo.costoConsumo, 2)}`,
+    500,
+    yC + 24,
+    { tam: 24, peso: 800, fuente: MONO, alinear: 'center', ancho: 900 }
+  )
+
   texto(ctx, 'TESORERÍA', 966, ALTO - 44, { tam: 15, alinear: 'right' })
 
   // A dónde yapear (ver domain/pago.js)
   if (pago) {
-    const yP = 640
+    const yP = 700
     caja(ctx, 34, yP, 760, 118, 3)
     texto(ctx, `PAGA POR ${pago.medio.toUpperCase()}:`, 50, yP + 28, { tam: 20, peso: 800 })
     ctx.font = `800 20px ${SANS}`

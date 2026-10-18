@@ -5,9 +5,11 @@ import { datosPago, textoCaptura } from '../domain/pago'
 // El recibo tal como es el talonario de papel del comité (mismos
 // casilleros, tinta azul sobre amarillo) - así lo que se imprime o se
 // manda por WhatsApp es lo que el vecino ya conoce.
-function Casilla({ etiqueta, children, className = '' }) {
+// `resaltar`: la diferencia de lectura y el coeficiente, que son lo que
+// se multiplica (pedido del usuario, 2026-10-17).
+function Casilla({ etiqueta, children, className = '', resaltar }) {
   return (
-    <div className={`flex items-stretch border-b border-recibo-tinta/60 last:border-b-0 ${className}`}>
+    <div className={`flex items-stretch border-b border-recibo-tinta/60 last:border-b-0 ${resaltar ? 'bg-recibo-tinta/15' : ''} ${className}`}>
       <span className="w-[46%] shrink-0 border-r border-recibo-tinta/60 px-1.5 py-1 text-[9px] font-bold uppercase leading-tight">{etiqueta}</span>
       <span className="money flex-1 px-1.5 py-1 text-right text-[12px] font-bold">{children}</span>
     </div>
@@ -52,7 +54,7 @@ export function ReciboPapel({ recibo, usuario, periodo, config }) {
           <Casilla etiqueta="Código de medidor">{usuario?.medidor}</Casilla>
           <Casilla etiqueta="Lectura actual">{formatearNumero(recibo.lecturaActual)}</Casilla>
           <Casilla etiqueta="Lectura anterior">{formatearNumero(recibo.lecturaAnterior)}</Casilla>
-          <Casilla etiqueta="Difer. de lectura">{formatearNumero(recibo.consumo)} kWh</Casilla>
+          <Casilla etiqueta="Difer. de lectura" resaltar>{formatearNumero(recibo.consumo)} kWh</Casilla>
           <Casilla etiqueta="Fecha lectura">{formatearFecha(periodo.fechaLectura)}</Casilla>
           <Casilla etiqueta="Fecha vencimiento">{formatearFecha(periodo.fechaVencimiento)}</Casilla>
           <Casilla etiqueta="Fecha corte">{formatearFecha(periodo.fechaCorte)}</Casilla>
@@ -61,7 +63,7 @@ export function ReciboPapel({ recibo, usuario, periodo, config }) {
           <div className="border-b border-recibo-tinta/60 px-1.5 py-1 text-[9px] font-bold uppercase leading-tight">
             Importe facturado del <span className="money">{formatearFecha(periodo.del)}</span> al <span className="money">{formatearFecha(periodo.al)}</span>
           </div>
-          <Casilla etiqueta="Coeficiente">{formatearNumero(periodo.coeficiente, 2)}</Casilla>
+          <Casilla etiqueta="Coeficiente" resaltar>{formatearNumero(periodo.coeficiente, 2)}</Casilla>
           <Casilla etiqueta="Costo kW consumido">{dinero(recibo.costoConsumo)}</Casilla>
           <Casilla etiqueta="Energía perdida">{dinero(recibo.energiaPerdida)}</Casilla>
           <Casilla etiqueta="Comisión comité control eléctrico">{dinero(recibo.comision)}</Casilla>
@@ -72,6 +74,17 @@ export function ReciboPapel({ recibo, usuario, periodo, config }) {
           </div>
         </div>
       </div>
+      {/* La cuenta del consumo, escrita */}
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 rounded border-2 border-recibo-tinta/70 bg-recibo-tinta/10 px-2 py-1 text-[11px] font-bold">
+        <span className="text-[9px] uppercase">Consumo:</span>
+        <span className="money">{formatearNumero(recibo.consumo)} kWh</span>
+        <span>×</span>
+        <span className="money">{formatearNumero(periodo.coeficiente, 2)}</span>
+        <span className="text-[9px] uppercase">(coef.)</span>
+        <span>=</span>
+        <span className="money">S/ {formatearNumero(recibo.costoConsumo, 2)}</span>
+      </div>
+
       <div className="mt-2 flex items-end justify-between gap-3">
         <CuadroPago recibo={recibo} config={config} />
         <p className="ml-auto shrink-0 text-[9px] font-bold uppercase tracking-widest">Tesorería</p>
